@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<web-app xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://java.sun.com/xml/ns/j2ee" xmlns:web="http://xmlns.jcp.org/xml/ns/javaee" xsi:schemaLocation="http://java.sun.com/xml/ns/j2ee http://java.sun.com/xml/ns/j2ee/web-app_2_4.xsd http://xmlns.jcp.org/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd" version="2.4">
+  <display-name>Callback Server Application</display-name>
+  <description>
+        This is a simple application that will handle Authy callback and polling requests.
+    </description>
+  
+  <servlet>
+    <servlet-name>OneTouchCallback</servlet-name>
+    <servlet-class>com.hubcitymedia.authycallback.servlets.OneTouchCallback</servlet-class>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>OneTouchCallback</servlet-name>
+    <url-pattern>/callback</url-pattern>
+  </servlet-mapping>
+  
+  <servlet>
+    <servlet-name>OneTouchPolling</servlet-name>
+    <servlet-class>com.hubcitymedia.authycallback.servlets.OneTouchPolling</servlet-class>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>OneTouchPolling</servlet-name>
+    <url-pattern>/polling/*</url-pattern>
+  </servlet-mapping>
+  
+  <servlet>
+  	<servlet-name>Health</servlet-name>
+  	<servlet-class>com.hubcitymedia.authycallback.servlets.Health</servlet-class>
+  </servlet>
+  <servlet-mapping>
+  	<servlet-name>Health</servlet-name>
+  	<url-pattern>/Health</url-pattern>
+  </servlet-mapping>
+  
+  <listener>
+    <listener-class>com.hubcitymedia.authycallback.objects.OneTouchPersistence</listener-class>
+  </listener>
+  <listener>
+    <listener-class>com.hubcitymedia.authycallback.servlets.OneTouchCallback</listener-class>
+  </listener>
+  <listener>
+    <listener-class>com.hubcitymedia.authycallback.servlets.OneTouchPolling</listener-class>
+  </listener>
+</web-app>
