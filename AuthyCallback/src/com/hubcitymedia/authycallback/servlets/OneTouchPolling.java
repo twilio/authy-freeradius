@@ -1,6 +1,5 @@
 package com.hubcitymedia.authycallback.servlets;
 
-
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.logging.FileHandler;
@@ -10,7 +9,6 @@ import java.util.logging.SimpleFormatter;
 import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
 import javax.servlet.ServletException;
-import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -36,10 +34,7 @@ public class OneTouchPolling	 extends HttpServlet implements ServletContextListe
 			try {
 				fh = new FileHandler(OneTouchPersistence.getLogLocation()+"Polling.log", true);
 				fh.setFormatter(new SimpleFormatter());
-			} catch (SecurityException e) {
-				e.printStackTrace();
-				throw new RuntimeException();
-			} catch (IOException e) {
+			} catch (SecurityException | IOException e) {
 				e.printStackTrace();
 				throw new RuntimeException();
 			}

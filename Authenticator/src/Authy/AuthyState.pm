@@ -1,13 +1,13 @@
-package HCM::AuthyState;
+package Authy::AuthyState;
 
 use 5.010;
 use strict;
 use warnings FATAL => 'all';
 use overload '""' => \&stringify;
 
+use Authy::Configuration;
+use Authy::Text;
 use Carp qw(croak);
-use HCM::Configuration;
-use HCM::Text;
 use JSON qw(encode_json decode_json);
 use Scalar::Util;
 

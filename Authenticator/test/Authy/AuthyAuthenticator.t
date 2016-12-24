@@ -7,11 +7,11 @@ use warnings FATAL => 'all';
 use Data::Dumper;
 use Test::More;
 
-use HCM::ModuleUtil;
-use HCM::Configuration;
+use Authy::ModuleUtil;
+use Authy::Configuration;
 
 BEGIN {
-    require 'HCM/AuthyAuthenticator.pl';
+    require 'Authy/AuthyAuthenticator.pl';
 }
 
 our $request = \%main::RAD_REQUEST;
@@ -94,14 +94,14 @@ subtest "Verifying OneTouch against Authy OneTouch endpoint" => sub {
 
 subtest "Verifying OneTouch against a custom endpoint" => sub {
     plan skip_all => "Using Authy OneTouch endpoint instead" unless cfg_one_touch_use_custom_polling_endpoint();
-    # plan skip_all => "OneTouch verification against a custom endpoint is working.";
+    plan skip_all => "OneTouch verification against a custom endpoint is working.";
 
     test_one_touch_directly();
 };
 
 subtest "Silent OTP RADIUS authentication" => sub {
     plan skip_all => "Silent OTP not enabled" unless cfg_auth_silent() && cfg_auth_otp_enabled();
-    plan skip_all => "Silent OTP is working";
+    # plan skip_all => "Silent OTP is working";
 
     say "Please enter the correct OTP";
     is(simulate_radius(password => "Password1;".prompt("OTP: ")), RLM_MODULE_OK, "Valid OTP detected");
@@ -126,16 +126,16 @@ subtest "Interactive OTP RADIUS authentication" => sub {
 
 subtest "Silent OneTouch RADIUS authentication" => sub {
     plan skip_all => "Silent OneTouch not enabled" unless cfg_auth_silent() && cfg_auth_one_touch_enabled();
-    plan skip_all => "Silent OneTouch is working";
+    # plan skip_all => "Silent OneTouch is working";
 
     say "Please approve the OneTouch request";
-    is(simulate_radius(), RLM_MODULE_OK, "Valid OTP detected");
+    is(simulate_radius(), RLM_MODULE_OK, "OneTouch approved successfully");
 
     say "Please deny the OneTouch request";
-    is(simulate_radius(), RLM_MODULE_REJECT, "Invalid OTP detected");
+    is(simulate_radius(), RLM_MODULE_REJECT, "OneTouch denied successfully");
 
     say "Please allow the OneTouch request to expire";
-    is(simulate_radius(), RLM_MODULE_REJECT, "Incorrect OTP detected");
+    is(simulate_radius(), RLM_MODULE_REJECT, "OneTouch expired successfully");
 };
 
 subtest "General RADIUS authentication" => sub {
@@ -180,7 +180,6 @@ sub simulate_radius (%) {
     %$request = (
         'User-Name'           => $options{username} // 'gmoore',
         'User-Password'       => $options{password} // 'Password1',
-        cfg_radius_id_param() => $options{id} // AUTHY_ID,
     );
 
     my $pass = 1;

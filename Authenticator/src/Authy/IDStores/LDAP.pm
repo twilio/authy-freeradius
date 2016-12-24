@@ -1,20 +1,17 @@
-package HCM::IDStores::LDAP;
+package Authy::IDStores::LDAP;
 
 use 5.010;
 use strict;
 use warnings FATAL => 'all';
 
+use Authy::ModuleUtil;
+use Authy::Text;
 use Carp qw(croak);
-use HCM::ModuleUtil;
-use HCM::Text;
 use ResourcePool;
 use ResourcePool::Factory::Net::LDAP;
 
-eval "use radiusd"; # For local testing.
-
 our $_CONNECTION_POOL;
 our ($_USER_BASE_DN, $_USER_NAME_ATTRIBUTE, $_ID_ATTRIBUTE);
-our ($_MSG, $_ERR);
 
 # Configuration option names:
 use constant {
@@ -50,25 +47,8 @@ use constant {
     _DEF_CONNECTION_RETRY_DELAY       => 0,
 };
 
-# Errors:
-use constant {
-    _ERR_ID_CANNOT_OPEN_CONNECTION => 'CannotOpenConnection',
-    _ERR_ID_MULTIPLE_USERS_FOUND   => 'MultipleUsersFound',
-    _ERR_ID_MULTIPLE_IDS_FOUND     => 'MultipleIDsFound',
-};
-
 sub initialize {
-    shift; # Skip the class name
-    my %params = (
-        config   => {},
-        messages => {},
-        errors   => {},
-        @_
-    );
-
-    my $config = $params{config};
-    $_MSG = $params{messages};
-    $_ERR = $params{errors};
+    my ($class, $config) = @_;
 
     # Load the configuration options.
     my $uri = _get_value($config, _OPT_URI, _DEF_URI);
@@ -88,19 +68,20 @@ sub initialize {
     my $connection_retry_delay = _get_value($config, _OPT_CONNECTION_RETRY_DELAY, _DEF_CONNECTION_RETRY_DELAY);
 
     # Validate the configuration options.
-    die "Cannot use StartTLS with an LDAPS URI\n" if $use_start_tls && $use_ldaps;
-    die "No LDAP bind password specified\n" unless defined $bind_password;
+    die "Cannot use StartTLS with an LDAPS URI\n"
+        if $use_start_tls && $use_ldaps;
+    die "No LDAP bind password specified\n"
+        unless defined $bind_password;
     die "Invalid initial LDAP connection pool size '$initial_connection_pool_size'\n"
         unless $initial_connection_pool_size =~ /^\d+$/;
-    die "Invalid max LDAP connection pool size '$max_connection_pool_size'\n" unless $max_connection_pool_size =~ /^\d+$/;
+    die "Invalid max LDAP connection pool size '$max_connection_pool_size'\n"
+        unless $max_connection_pool_size =~ /^\d+$/;
+    die "Max LDAP connection pool size must be at least 1"
+        unless int($max_connection_pool_size) >= 1;
     die "Initial LDAP connection pool size must be less than or equal to the max LDAP connection pool size\n"
         unless $initial_connection_pool_size <= $max_connection_pool_size;
-    die "Invalid LDAP connection retry delay '$connection_retry_delay'\n" unless $connection_retry_delay =~ /^\d+$/;
-
-    # Ensure that the messages were loaded.
-    _ensure_err($_ERR, _ERR_ID_CANNOT_OPEN_CONNECTION);
-    _ensure_err($_ERR, _ERR_ID_MULTIPLE_IDS_FOUND);
-    _ensure_err($_ERR, _ERR_ID_MULTIPLE_USERS_FOUND);
+    die "Invalid LDAP connection retry delay '$connection_retry_delay'\n"
+        unless $connection_retry_delay =~ /^\d+$/;
 
     # Create the connection pool.
     my $conn_factory;
@@ -123,14 +104,17 @@ sub initialize {
     $conn_factory->bind($bind_dn, password => $bind_password);
 
     # Initialize the connection pool.
-    radiusd::radlog(L_DBG, "Initializing LDAP connection pool\n");
-    $_CONNECTION_POOL = ResourcePool->new(
-        $conn_factory,
-        Max        => $max_connection_pool_size,
-        MaxTry     => $max_connection_pool_size,
-        PreCreate  => $initial_connection_pool_size,
-        RetryDelay => [$connection_retry_delay],
-    );
+    log_dbg("Initializing LDAP connection pool");
+    eval {
+        $_CONNECTION_POOL = ResourcePool->new(
+            $conn_factory,
+            Max        => $max_connection_pool_size,
+            MaxTry     => $max_connection_pool_size,
+            PreCreate  => $initial_connection_pool_size,
+            RetryDelay => [$connection_retry_delay],
+        );
+    };
+    die "Could not initialize LDAP connection pool: $@\n";
 }
 
 sub _get_value {
@@ -141,7 +125,10 @@ sub _get_value {
 
     my $value = $config->{$option_name};
     if (!defined $value && defined $default_value) {
-        radiusd::radlog(L_INFO, msg_using_default_value('ID Store', $option_name, $default_value));
+        log_info(
+            sprintf("No value specified for configuration setting 'ID Store/%s'; using the default value: '%s'",
+                    $option_name, $default_value)
+        );
         $value = $default_value;
     }
     if (defined $value) {
@@ -153,68 +140,63 @@ sub _get_value {
     return $value;
 }
 
-sub _ensure_err {
-    my ($bundle, $id) = @_;
-    die "ID store error message '$id' not specified\n" unless defined $bundle->{$id};
-}
-
 sub get_authy_id {
     my (undef, $user_name) = @_;
 
     # Open a connection to the LDAP server.
     my $conn = $_CONNECTION_POOL->get();
     if (!defined $conn) {
-        die $_ERR->{_ERR_ID_CANNOT_OPEN_CONNECTION()}."\n";
+        die "Cannot open a connection to the LDAP server\n";
     }
 
     # Retrieve the user's Authy ID.
-    radiusd::radlog(L_DBG, "Retrieving Authy ID from LDAP store");
+    log_dbg("Retrieving Authy ID from LDAP store");
     my $authy_id = eval { _get_authy_id($conn, $user_name) };
     my $error = $@;
 
     # Free the connection.
     $_CONNECTION_POOL->free($conn);
 
-    die $error if $error;
-    return $authy_id;
+    return $authy_id if !$error;
+    die $error;
 }
 
 sub _get_authy_id {
     my ($conn, $user_name) = @_;
 
     # Check that there is a unique entry for the user name.
-    my $search_result = eval {
-        $conn->search(
-            base      => $_USER_BASE_DN,
-            sizelimit => 2, # Only two matching entries are needed to detect a clash.
-            filter    => "($_USER_NAME_ATTRIBUTE=$user_name)",
-            attrs     => [$_ID_ATTRIBUTE],
-        );
-    };
+    my $search_result =$conn->search(
+        base      => $_USER_BASE_DN,
+        sizelimit => 2, # Only two matching entries are needed to detect a clash.
+        filter    => "($_USER_NAME_ATTRIBUTE=$user_name)",
+        attrs     => [$_ID_ATTRIBUTE],
+    );
+    die "".$search_result->error()."\n" if $search_result->code;
+
     my @entries = $search_result->entries();
     if (@entries < 1) {
-        radiusd::radlog(L_DBG, "No LDAP user found with $_ID_ATTRIBUTE '$user_name'");
+        log_dbg("No LDAP user found with $_ID_ATTRIBUTE '$user_name'");
         return undef;
     }
     if (@entries > 1) {
-        die sprintf($_ERR->{_ERR_ID_MULTIPLE_USERS_FOUND()}, $_ID_ATTRIBUTE, $user_name);
+        die sprintf("Multiple LDAP users found with %s '%s'", $_ID_ATTRIBUTE, $user_name);
     }
-    radiusd::radlog(L_DBG, "Found user ".($entries[0]->dn()));
+    log_dbg("Found user ".($entries[0]->dn()));
 
     # Check that there is a unique Authy ID in the user details.
     my @authy_ids = $entries[0]->get_value($_ID_ATTRIBUTE);
-    if (@authy_ids < 1) {
-        radiusd::radlog(L_DBG, "No Authy ID found for LDAP user '$user_name'");
-        return undef;
+    if (@authy_ids == 1) {
+        my $authy_id = $authy_ids[0];
+        log_dbg("Found Authy ID '$authy_id' for LDAP user '$user_name'");
+        return $authy_id;
     }
-    if (@authy_ids > 1) {
-        die sprintf($_ERR->{_ERR_ID_MULTIPLE_IDS_FOUND()}, $user_name)."\n";
+    elsif (@authy_ids > 1) {
+        die sprintf("Multiple Authy IDs found for LDAP user '%s'", $user_name)."\n";
     }
 
-    # Return the Authy ID.
-    my $authy_id = $authy_ids[0];
-    radiusd::radlog(L_DBG, "Found Authy ID '$authy_id' for LDAP user '$user_name'");
-    return $authy_id;
+    # Leave with nothing.
+    log_dbg("No Authy ID found for LDAP user '$user_name'");
+    return undef;
 }
 
 1;

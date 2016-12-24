@@ -1,4 +1,5 @@
 package com.hubcitymedia.authycallback.objects;
+
 import java.io.IOException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.FileHandler;
@@ -19,7 +20,7 @@ public class OneTouchPersistence implements ServletContextListener{
 
 	private void init()
 	{
-		requestMap = new ConcurrentHashMap<String, String>();
+		requestMap = new ConcurrentHashMap<>();
 		
 		AUTHY_LOG_LOCATION = System.getenv("AUTHY_LOG_LOCATION");
 		if(AUTHY_LOG_LOCATION == null)
@@ -34,10 +35,7 @@ public class OneTouchPersistence implements ServletContextListener{
 			try {
 				fh = new FileHandler(AUTHY_LOG_LOCATION+"/Persistence.log", true);
 				fh.setFormatter(new SimpleFormatter());
-			} catch (SecurityException e) {
-				e.printStackTrace();
-				throw new RuntimeException();
-			} catch (IOException e) {
+			} catch (SecurityException | IOException e) {
 				e.printStackTrace();
 				throw new RuntimeException();
 			}
