@@ -30,6 +30,11 @@ public class Health extends HttpServlet{
 	 * @see HttpServlet#doPost(HttpServletRequest request, HttpServletResponse response)
 	 */
 	protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+		//If response found, respond with status
+		response.setContentType("text/plain");
+		PrintWriter out = response.getWriter();
+		out.print("OK");
+		out.flush();
 	}
 	
 }
