@@ -9,7 +9,7 @@ use Authy::Text;
 use Carp qw(croak);
 use HTTP::Headers;
 use HTTP::Status qw(:constants);
-use JSON qw(encode_json decode_json);
+use JSON;
 use LWP::UserAgent;
 use Module::Load qw(load);
 use Time::HiRes qw(time sleep);
@@ -352,7 +352,7 @@ sub _send_otp_request {
     # Convert the response content to JSON.
     my $res_code = $res->code();
     my $res_content = $res->decoded_content();
-    my $res_json = eval { decode_json($res_content) };
+    my $res_json = eval { JSON->new->allow_nonref->decode($res_content) };
     die err(ERR_OTP_PROMPT_REQUEST_FAILED_EXTERNALLY, $res_code, $@)."\n" if $@;
 
     # Process the response.
@@ -384,7 +384,7 @@ sub _is_correct_otp {
     # Convert the response content to JSON.
     my $res_code = $res->code();
     my $res_content = $res->decoded_content();
-    my $res_json = eval { decode_json($res_content) };
+    my $res_json = eval { JSON->new->allow_nonref->decode($res_content) };
     die err(ERR_OTP_VERIFICATION_REQUEST_FAILED_EXTERNALLY, $res_code, $@)."\n" if $@;
 
     # The token is valid if the response was 200 OK and the token "is valid".
@@ -426,7 +426,7 @@ sub _create_one_touch_approval_request {
     };
     my $res = $user_agent->post(cfg_one_touch_approval_request_creation_url($id),
         Content_Type => 'application/json',
-        Content => encode_json($data)
+        Content => JSON->new->allow_nonref->encode($data)
     );
     eval {
         _ensure_external_response($res);
@@ -436,7 +436,7 @@ sub _create_one_touch_approval_request {
     # Convert the response content to JSON.
     my $res_code = $res->code();
     my $res_content = $res->decoded_content();
-    my $res_json = eval { decode_json($res_content) };
+    my $res_json = eval { JSON->new->allow_nonref->decode($res_content) };
     die err(ERR_ONE_TOUCH_APPROVAL_REQUEST_CREATION_FAILED_EXTERNALLY, $res_code, $@)."\n" if $@;
 
     # Return the request UUID sent back from Authy if provided.
@@ -510,7 +510,7 @@ sub _parse_one_touch_api_endpoint_response {
     # Convert the response content to JSON.
     my $res_code = $res->code();
     my $res_content = $res->decoded_content();
-    my $res_json = eval { decode_json($res_content) };
+    my $res_json = eval { JSON->new->allow_nonref->decode($res_content) };
     die err(ERR_ONE_TOUCH_APPROVAL_REQUEST_CREATION_FAILED_EXTERNALLY, $res_code, $@)."\n" if $@;
 
     # Extract the response details.
