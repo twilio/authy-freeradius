@@ -607,7 +607,7 @@ sub cfg_otp_verification_url {
     my ($otp, $id) = @_;
     croak "No OTP specified" unless defined $otp;
     croak "No ID specified" unless defined $id;
-    return sprintf _AUTHY_OTP_VERIFICATION_URL, $otp, $id, (cfg_otp_allow_unregistered_users() ? 'false' : 'true');
+    return sprintf _AUTHY_OTP_VERIFICATION_URL, $otp, $id, (cfg_otp_allow_unregistered_users() ? 'true' : 'false');
 }
 
 sub cfg_one_touch_approval_request_creation_url {
