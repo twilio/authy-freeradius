@@ -115,18 +115,19 @@ sub _authorize_silent {
     # Validate the request.
     my $user_name = $RAD_REQUEST{'User-Name'};
     return _reply_invalid(ERR_AUTH_NO_USER_NAME_IN_REQUEST) unless defined $user_name;
+    my $id;
     if (!defined $_ID_STORE_MODULE) {
         # Ensure that the Authy ID has already been found.
-        return defined $RAD_REQUEST{cfg_radius_id_param()}
-            ? _reply_noop()
-            : _reply_invalid(ERR_AUTH_NO_ID_IN_REQUEST);
+        $id = $RAD_REQUEST{cfg_radius_id_param()} if defined $RAD_REQUEST{cfg_radius_id_param()};
+        return _reply_invalid(ERR_AUTH_NO_ID_IN_REQUEST) unless defined $id;
     }
-
-    # Retrieve the ID using the user name.
-    log_dbg("Retrieving Authy ID for '$user_name'");
-    my $id = eval { $_ID_STORE_MODULE->get_authy_id($user_name) };
-    return _reply_error(ERR_AUTH_ID_RETRIEVAL_FAILED, $@) if $@;
-    return _reply_no_id() unless defined $id;
+    else {
+        # Retrieve the ID using the user name.
+        log_dbg("Retrieving Authy ID for '$user_name'");
+        $id = eval { $_ID_STORE_MODULE->get_authy_id($user_name) };
+        return _reply_error(ERR_AUTH_ID_RETRIEVAL_FAILED, $@) if $@;
+        return _reply_no_id() unless defined $id;
+    }
     return _reply_error(ERR_AUTH_INVALID_ID) unless _looks_like_valid_id($id);
 
     # Nothing needs to be done for OneTouch-only authentication.
