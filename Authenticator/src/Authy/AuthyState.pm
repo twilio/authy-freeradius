@@ -5,6 +5,8 @@ use strict;
 use warnings FATAL => 'all';
 use overload '""' => \&stringify;
 
+use experimental 'smartmatch';
+
 use Authy::Configuration;
 use Authy::Text;
 use Carp qw(croak);
