@@ -8,7 +8,7 @@ use Authy::ModuleUtil;
 use Authy::Text;
 use Carp qw(croak);
 use Encode qw(encode);
-use Parse::CSV;
+use Text::CSV_XS;
 
 our ($_FILE, $_SEPARATOR, $_QUOTE, $_ESCAPE_CHARACTER, $_USER_NAME_INDEX, $_ID_INDEX);
 
@@ -89,19 +89,16 @@ sub get_authy_id {
     # Create the flat file parser.
     my $id;
     open my $parser_fh, '<:encoding(UTF-8)', $_FILE or die "Cannot open flat file at $_FILE: $!";
-    my $parser = Parse::CSV->new(
-        handle   => $parser_fh,
-        csv_attr => {
-            binary      => 1,
-            sep         => $_SEPARATOR,
-            quote       => $_QUOTE,
-            escape_char => $_ESCAPE_CHARACTER,
-        },
-    );
+    my $csv = Text::CSV_XS->new({
+        binary      => 1,
+        sep         => $_SEPARATOR,
+        quote       => $_QUOTE,
+        escape_char => $_ESCAPE_CHARACTER,
+    });
 
     # Search each entry for a matching user.
     my $lc_user_name = lc $user_name;
-    while (my $entry = $parser->fetch()) {
+    while (my $entry = $csv->getline($parser_fh)) {
         if ($lc_user_name eq lc $entry->[$_USER_NAME_INDEX]) {
             $id = $entry->[$_ID_INDEX];
             last;
@@ -112,10 +109,12 @@ sub get_authy_id {
     close $parser_fh or log_err("Unable to close flat file $_FILE: $!");
 
     # Return the ID if everything went well.
-    return $id unless $parser->errstr;
+    my $csv_error = 0 + $csv->error_diag();
+    $csv_error = 0 if ($csv_error == 2012); # 2012 is EOF
+    return $id unless $csv_error;
 
     # Throw the resulting error.
-    die sprintf("Failed to parse flat file: %s", $parser->errstr);
+    die sprintf("Failed to parse flat file: ". $csv->error_diag());
 }
 
 1;
