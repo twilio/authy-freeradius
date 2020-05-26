@@ -130,7 +130,7 @@ sub _authorize_silent {
     return _reply_error(ERR_AUTH_INVALID_ID) unless _looks_like_valid_id($id);
 
     # Nothing needs to be done for OneTouch-only authentication.
-    return _reply_noop() if cfg_auth_only_one_touch_enabled();
+    return _reply_updated(id => $id) if cfg_auth_only_one_touch_enabled();
 
     # Verify that there is no OTP parameter already specified, as this would suggest a possible injection.
     return _reply_invalid(ERR_AUTH_UNEXPECTED_OTP_IN_REQUEST) if defined $RAD_REQUEST{cfg_radius_otp_param()};
@@ -139,19 +139,21 @@ sub _authorize_silent {
     my $full_password = $RAD_REQUEST{'User-Password'};
     return _reply_invalid(ERR_AUTH_NO_PASSWORD_IN_REQUEST) unless defined $full_password;
 
-    # If the password delimiter is not found, then no further action is required.
-    my $delimiter = cfg_otp_delimiter();
-    return _reply_ok() if !cfg_auth_only_otp_enabled() || index($full_password, $delimiter) < 0;
-
     # Attempt to split the password at the OTP delimiter.
-    log_dbg("Separating password and OTP at delimiter '$delimiter'");
+    my $delimiter = cfg_otp_delimiter();
     my $delimiter_index = rindex($full_password, $delimiter);
     my $password = substr $full_password, 0, $delimiter_index;
     my $otp = substr $full_password, $delimiter_index + length $delimiter;
 
-    # Validate the OTP.
-    return _reply_updated(id => $id, password => $password, otp => $otp) if _looks_like_valid_otp($otp);
-    return _reply_rejection();
+    # If the password delimiter or valid OTP is not found, then no further action is required.
+    if (($delimiter_index < 0) || (! _looks_like_valid_otp($otp))) {
+        return _reply_updated(id => $id) if !cfg_auth_only_otp_enabled();
+        return _reply_invalid(ERR_AUTH_NO_OTP_IN_REQUEST);
+    }
+
+    # Update password and OTP.
+    log_dbg("Separating password and OTP at delimiter '$delimiter'");
+    return _reply_updated(id => $id, password => $password, otp => $otp);
 }
 
 sub authenticate {
