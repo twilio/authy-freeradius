@@ -20,6 +20,9 @@ our @ISA = qw(Exporter);
 our @EXPORT = qw(
     cfg_radius_id_param
     cfg_radius_otp_param
+    cfg_radius_email_param
+    cfg_radius_cellphone_param
+    cfg_radius_countrycode_param
     cfg_radius_reply_auth_type
     cfg_radius_state_marker
 
@@ -29,6 +32,7 @@ our @EXPORT = qw(
     cfg_auth_one_touch_enabled
     cfg_auth_otp_option
     cfg_auth_one_touch_option
+    cfg_auth_create_user
     cfg_auth_id_store_home
     cfg_auth_id_store_module
 
@@ -55,6 +59,7 @@ our @EXPORT = qw(
     cfg_auth_only_one_touch_enabled
     cfg_auth_otp_and_one_touch_enabled
     cfg_auth_id_store_module_path
+    cfg_otp_create_user_url
     cfg_otp_sms_url
     cfg_otp_verification_url
     cfg_one_touch_approval_request_creation_url
@@ -87,18 +92,24 @@ use constant {
 
 # RADIUS configuration option names:
 use constant {
-    _OPT_RADIUS_ID_PARAM        => 'IDParam',
-    _OPT_RADIUS_OTP_PARAM       => 'OTPParam',
-    _OPT_RADIUS_REPLY_AUTH_TYPE => 'ReplyAuthType',
-    _OPT_RADIUS_STATE_MARKER    => 'StateMarker',
+    _OPT_RADIUS_ID_PARAM          => 'IDParam',
+    _OPT_RADIUS_OTP_PARAM         => 'OTPParam',
+    _OPT_RADIUS_EMAIL_PARAM       => 'EmailParam',
+    _OPT_RADIUS_CELLPHONE_PARAM   => 'CellphoneParam',
+    _OPT_RADIUS_COUNTRYCODE_PARAM => 'CountrycodeParam',
+    _OPT_RADIUS_REPLY_AUTH_TYPE   => 'ReplyAuthType',
+    _OPT_RADIUS_STATE_MARKER      => 'StateMarker',
 };
 
 # Default RADIUS configuration values:
 use constant {
-    _DEF_RADIUS_ID_PARAM        => 'Authy-ID',
-    _DEF_RADIUS_OTP_PARAM       => 'Authy-OTP',
-    _DEF_RADIUS_REPLY_AUTH_TYPE => 'authy-reply',
-    _DEF_RADIUS_STATE_MARKER    => 'Authy::AuthyState',
+    _DEF_RADIUS_ID_PARAM          => 'Authy-ID',
+    _DEF_RADIUS_OTP_PARAM         => 'Authy-OTP',
+    _DEF_RADIUS_EMAIL_PARAM       => 'Authy-Email',
+    _DEF_RADIUS_CELLPHONE_PARAM   => 'Authy-Cellphone',
+    _DEF_RADIUS_COUNTRYCODE_PARAM => 'Authy-Countrycode',
+    _DEF_RADIUS_REPLY_AUTH_TYPE   => 'authy-reply',
+    _DEF_RADIUS_STATE_MARKER      => 'Authy::AuthyState',
 };
 
 # Authentication/authorization configuration option names:
@@ -111,6 +122,7 @@ use constant {
     _OPT_AUTH_ONE_TOUCH_ENABLED  => 'OneTouchEnabled',
     _OPT_AUTH_OTP_OPTION         => 'OTPOption',
     _OPT_AUTH_ONE_TOUCH_OPTION   => 'OneTouchOption',
+    _OPT_AUTH_CREATE_USER        => 'CreateUser',
     _OPT_AUTH_ID_STORE_HOME      => 'IDStoreHome',
     _OPT_AUTH_ID_STORE_MODULE    => 'IDStoreModule',
 };
@@ -125,6 +137,7 @@ use constant {
     _DEF_AUTH_ONE_TOUCH_ENABLED  => 0,
     _DEF_AUTH_OTP_OPTION         => undef,
     _DEF_AUTH_ONE_TOUCH_OPTION   => undef,
+    _DEF_AUTH_CREATE_USER        => 0,
     _DEF_AUTH_ID_STORE_HOME      => undef,
     _DEF_AUTH_ID_STORE_MODULE    => undef,
 };
@@ -176,6 +189,7 @@ use constant {
 # URLs:
 use constant {
     _AUTHY_API_KEY_VERIFICATION_URL                => 'https://api.authy.com/protected/json/app/details',
+    _AUTHY_OTP_CREATE_USER_URL                     => 'https://api.authy.com/protected/json/users/new',
     _AUTHY_OTP_SMS_URL                             => 'https://api.authy.com/protected/json/sms/%s?force=%s',
     _AUTHY_OTP_VERIFICATION_URL                    => 'https://api.authy.com/protected/json/verify/%s/%s?force=%s',
     _AUTHY_ONE_TOUCH_APPROVAL_REQUEST_CREATION_URL => 'https://api.authy.com/onetouch/json/users/%s/approval_requests',
@@ -213,6 +227,9 @@ sub _load_config {
     # Extract the RADIUS configuration options.
     _put_str ($_CFG_RADIUS, $config, _SECTION_RADIUS, _OPT_RADIUS_ID_PARAM, _DEF_RADIUS_ID_PARAM);
     _put_str ($_CFG_RADIUS, $config, _SECTION_RADIUS, _OPT_RADIUS_OTP_PARAM, _DEF_RADIUS_OTP_PARAM);
+    _put_str ($_CFG_RADIUS, $config, _SECTION_RADIUS, _OPT_RADIUS_EMAIL_PARAM, _DEF_RADIUS_EMAIL_PARAM);
+    _put_str ($_CFG_RADIUS, $config, _SECTION_RADIUS, _OPT_RADIUS_CELLPHONE_PARAM, _DEF_RADIUS_CELLPHONE_PARAM);
+    _put_str ($_CFG_RADIUS, $config, _SECTION_RADIUS, _OPT_RADIUS_COUNTRYCODE_PARAM, _DEF_RADIUS_COUNTRYCODE_PARAM);
     _put_str ($_CFG_RADIUS, $config, _SECTION_RADIUS, _OPT_RADIUS_REPLY_AUTH_TYPE, _DEF_RADIUS_REPLY_AUTH_TYPE);
     _put_str ($_CFG_RADIUS, $config, _SECTION_RADIUS, _OPT_RADIUS_STATE_MARKER, _DEF_RADIUS_STATE_MARKER);
 
@@ -225,6 +242,7 @@ sub _load_config {
     _put_str ($_CFG_AUTH, $config, _SECTION_AUTH, _OPT_AUTH_ONE_TOUCH_ENABLED, _DEF_AUTH_ONE_TOUCH_ENABLED);
     _put_str ($_CFG_AUTH, $config, _SECTION_AUTH, _OPT_AUTH_OTP_OPTION, _DEF_AUTH_OTP_OPTION);
     _put_str ($_CFG_AUTH, $config, _SECTION_AUTH, _OPT_AUTH_ONE_TOUCH_OPTION, _DEF_AUTH_ONE_TOUCH_OPTION);
+    _put_str ($_CFG_AUTH, $config, _SECTION_AUTH, _OPT_AUTH_CREATE_USER, _DEF_AUTH_CREATE_USER);
     _put_str ($_CFG_AUTH, $config, _SECTION_AUTH, _OPT_AUTH_ID_STORE_HOME, _DEF_AUTH_ID_STORE_HOME);
     _put_str ($_CFG_AUTH, $config, _SECTION_AUTH, _OPT_AUTH_ID_STORE_MODULE, _DEF_AUTH_ID_STORE_MODULE);
 
@@ -424,6 +442,18 @@ sub cfg_radius_otp_param {
     return $_CFG_RADIUS->{_OPT_RADIUS_OTP_PARAM()};
 }
 
+sub cfg_radius_email_param {
+    return $_CFG_RADIUS->{_OPT_RADIUS_EMAIL_PARAM()};
+}
+
+sub cfg_radius_cellphone_param {
+    return $_CFG_RADIUS->{_OPT_RADIUS_CELLPHONE_PARAM()};
+}
+
+sub cfg_radius_countrycode_param {
+    return $_CFG_RADIUS->{_OPT_RADIUS_COUNTRYCODE_PARAM()};
+}
+
 sub cfg_radius_reply_auth_type {
     return $_CFG_RADIUS->{_OPT_RADIUS_REPLY_AUTH_TYPE()};
 }
@@ -466,6 +496,10 @@ sub cfg_auth_otp_option {
 
 sub cfg_auth_one_touch_option {
     return $_CFG_AUTH->{_OPT_AUTH_ONE_TOUCH_OPTION()};
+}
+
+sub cfg_auth_create_user {
+    return $_CFG_AUTH->{_OPT_AUTH_CREATE_USER()};
 }
 
 sub cfg_auth_id_store_home {
@@ -595,6 +629,10 @@ sub cfg_auth_id_store_module_path {
     my @components = split '::', cfg_auth_id_store_module();
     $path = File::Spec->join(@components).'.pm';
     return $path;
+}
+
+sub cfg_otp_create_user_url {
+    return sprintf _AUTHY_OTP_CREATE_USER_URL;
 }
 
 sub cfg_otp_sms_url {

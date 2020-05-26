@@ -9,6 +9,7 @@ use Authy::Text;
 use Carp qw(croak);
 use Encode qw(encode);
 use Text::CSV_XS;
+use Fcntl qw(:flock SEEK_END);
 
 our ($_FILE, $_SEPARATOR, $_QUOTE, $_ESCAPE_CHARACTER, $_USER_NAME_INDEX, $_ID_INDEX);
 
@@ -89,6 +90,7 @@ sub get_authy_id {
     # Create the flat file parser.
     my $id;
     open my $parser_fh, '<:encoding(UTF-8)', $_FILE or die "Cannot open flat file at $_FILE: $!";
+    flock($parser_fh, LOCK_SH) or die "Cannot lock flat file at $_FILE: $!";
     my $csv = Text::CSV_XS->new({
         binary      => 1,
         sep         => $_SEPARATOR,
@@ -106,6 +108,7 @@ sub get_authy_id {
     }
 
     # Close the parser file handle.
+    flock($parser_fh, LOCK_UN) or log_err("Cannot unlock flat file at $_FILE: $!");
     close $parser_fh or log_err("Unable to close flat file $_FILE: $!");
 
     # Return the ID if everything went well.
@@ -115,6 +118,29 @@ sub get_authy_id {
 
     # Throw the resulting error.
     die sprintf("Failed to parse flat file: ". $csv->error_diag());
+}
+
+sub set_authy_id {
+    my (undef, $user_name, $id) = @_;
+
+    # Open and lock the file
+    open my $parser_fh, '>>:encoding(UTF-8)', $_FILE or die "Cannot open flat file at $_FILE: $!";
+    flock($parser_fh, LOCK_EX) or die "Cannot lock flat file at $_FILE: $!";
+
+    # Construct the new line
+    my $line = "";
+    for (my $i=0; (($i <= $_USER_NAME_INDEX) || ($i <= $_ID_INDEX)); $i++) {
+        $line .= $user_name if ($i == $_USER_NAME_INDEX);
+        $line .= $id if ($i == $_ID_INDEX);
+        $line .= $_SEPARATOR;
+    }
+    # Save the ID
+    seek($parser_fh, 0, SEEK_END) or die "Cannot seek flat file at $_FILE: $!";
+    print $parser_fh "$line\n" or die "Cannot write flat file at $_FILE: $!";
+
+    # Close the file handle.
+    flock($parser_fh, LOCK_UN) or log_err("Cannot unlock flat file at $_FILE: $!");
+    close $parser_fh or log_err("Unable to close flat file $_FILE: $!");
 }
 
 1;

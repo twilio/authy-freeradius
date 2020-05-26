@@ -39,6 +39,10 @@ our @EXPORT = qw(
     ERR_AUTH_ID_RETRIEVAL_FAILED
     ERR_AUTH_INVALID_ID
     ERR_AUTH_INVALID_STATE
+    ERR_AUTH_NO_EMAIL_IN_REQUEST
+    ERR_AUTH_NO_CELLPHONE_IN_REQUEST
+    ERR_AUTH_NO_COUNTRYCODE_IN_REQUEST
+    ERR_AUTH_ID_SAVING_FAILED
 
     ERR_OTP_PROMPT_REQUEST_FAILED_INTERNALLY
     ERR_OTP_PROMPT_REQUEST_FAILED_EXTERNALLY
@@ -52,6 +56,9 @@ our @EXPORT = qw(
     ERR_ONE_TOUCH_CUSTOM_ENDPOINT_FAILED_INTERNALLY
     ERR_ONE_TOUCH_CUSTOM_ENDPOINT_FAILED_EXTERNALLY
     ERR_ONE_TOUCH_ENDPOINT_RETURNED_INVALID_STATUS
+
+    ERR_CREATE_USER_REQUEST_FAILED_INTERNALLY
+    ERR_CREATE_USER_REQUEST_FAILED_EXTERNALLY
 
     msg
     err
@@ -88,6 +95,10 @@ use constant {
     ERR_AUTH_ID_RETRIEVAL_FAILED                              => '01-007',
     ERR_AUTH_INVALID_ID                                       => '01-008',
     ERR_AUTH_INVALID_STATE                                    => '01-009',
+    ERR_AUTH_NO_EMAIL_IN_REQUEST                              => '01-010',
+    ERR_AUTH_NO_CELLPHONE_IN_REQUEST                          => '01-011',
+    ERR_AUTH_NO_COUNTRYCODE_IN_REQUEST                        => '01-012',
+    ERR_AUTH_ID_SAVING_FAILED                                 => '01-013',
 
     ERR_OTP_PROMPT_REQUEST_FAILED_INTERNALLY                  => '02-001',
     ERR_OTP_PROMPT_REQUEST_FAILED_EXTERNALLY                  => '02-002',
@@ -101,6 +112,9 @@ use constant {
     ERR_ONE_TOUCH_CUSTOM_ENDPOINT_FAILED_INTERNALLY           => '03-005',
     ERR_ONE_TOUCH_CUSTOM_ENDPOINT_FAILED_EXTERNALLY           => '03-006',
     ERR_ONE_TOUCH_ENDPOINT_RETURNED_INVALID_STATUS            => '03-007',
+
+    ERR_CREATE_USER_REQUEST_FAILED_INTERNALLY                 => '04-001',
+    ERR_CREATE_USER_REQUEST_FAILED_EXTERNALLY                 => '04-002',
 };
 
 our %_MESSAGES = ();
@@ -132,6 +146,14 @@ our %_ERRORS = (
         "Invalid Authy ID",
     ERR_AUTH_INVALID_STATE() =>
         "Invalid Authy state: %s",
+    ERR_AUTH_NO_EMAIL_IN_REQUEST() =>
+        "No email found in the request",
+    ERR_AUTH_NO_CELLPHONE_IN_REQUEST() =>
+        "No cellphone found in the request",
+    ERR_AUTH_NO_COUNTRYCODE_IN_REQUEST() =>
+        "No country code found in the request",
+    ERR_AUTH_ID_SAVING_FAILED() =>
+        "ID saving failed: %s",
 
     ERR_OTP_PROMPT_REQUEST_FAILED_INTERNALLY() =>
         "Could not send Authy OTP prompt request: %s",
@@ -156,6 +178,11 @@ our %_ERRORS = (
         "Authy OneTouch custom endpoint poll failed with status code %s: %s",
     ERR_ONE_TOUCH_ENDPOINT_RETURNED_INVALID_STATUS() =>
         "Authy OneTouch custom endpoint returned an invalid status: '%s'",
+
+    ERR_CREATE_USER_REQUEST_FAILED_INTERNALLY() =>
+        "Could not send Authy create user request: %s",
+    ERR_CREATE_USER_REQUEST_FAILED_EXTERNALLY() =>
+        "Authy create user request failed with status code %s: %s",
 );
 
 sub import {

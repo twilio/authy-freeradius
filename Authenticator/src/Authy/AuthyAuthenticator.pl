@@ -72,22 +72,39 @@ sub _authorize_interactive_without_state {
     # Validate the request.
     my $user_name = $RAD_REQUEST{'User-Name'};
     return _reply_invalid(ERR_AUTH_NO_USER_NAME_IN_REQUEST) unless defined $user_name;
-    if (defined $_ID_STORE_MODULE) {
+    my $id;
+    if (!defined $_ID_STORE_MODULE) {
+        # Ensure that the Authy ID has already been found.
+        $id = $RAD_REQUEST{cfg_radius_id_param()} if defined $RAD_REQUEST{cfg_radius_id_param()};
+        return _reply_invalid(ERR_AUTH_NO_ID_IN_REQUEST) unless (defined $id || cfg_auth_create_user());
+    }
+    else {
         # Retrieve the ID using the user name.
         log_dbg("Retrieving Authy ID for '$user_name'");
         my $id = eval { $_ID_STORE_MODULE->get_authy_id($user_name) };
         return _reply_error(ERR_AUTH_ID_RETRIEVAL_FAILED, $@) if $@;
+        return _reply_no_id() unless (defined $id || cfg_auth_create_user());
+    }
+    # Create the user
+    if (! defined $id) {
+        log_dbg("Creating Authy ID for '$user_name'");
+        my $email = $RAD_REQUEST{cfg_radius_email_param()};
+        return _reply_invalid(ERR_AUTH_NO_EMAIL_IN_REQUEST) unless defined $email;
+        my $cellphone = $RAD_REQUEST{cfg_radius_cellphone_param()};
+        return _reply_invalid(ERR_AUTH_NO_CELLPHONE_IN_REQUEST) unless defined $cellphone;
+        my $countrycode = $RAD_REQUEST{cfg_radius_countrycode_param()};
+        return _reply_invalid(ERR_AUTH_NO_COUNTRYCODE_IN_REQUEST) unless defined $countrycode;
+        $id = _create_user($email, $cellphone, $countrycode);
+        if ((defined $_ID_STORE_MODULE) && ($_ID_STORE_MODULE->can('set_authy_id'))) {
+            log_dbg("Saving Authy ID for '$user_name'");
+            eval { $_ID_STORE_MODULE->set_authy_id($user_name, $id) };
+            return _reply_error(ERR_AUTH_ID_SAVING_FAILED, $@) if $@;
+        }
+    }
+    return _reply_error(ERR_AUTH_INVALID_ID) unless _looks_like_valid_id($id);
 
-        # If an ID was found, then insert the ID into the request.
-        return _reply_updated(id => $id) if _looks_like_valid_id($id);
-        return _reply_no_id() unless defined $id;
-        return _reply_error(ERR_AUTH_INVALID_ID);
-    }
-    else {
-        # Ensure that the Authy ID has already been found.
-        return _reply_noop() if defined $RAD_REQUEST{cfg_radius_id_param()};
-        return _reply_invalid(ERR_AUTH_NO_ID_IN_REQUEST);
-    }
+    # Insert the ID into the request.
+    return _reply_updated(id => $id);
 }
 
 sub _authorize_interactive_with_state {
@@ -119,14 +136,30 @@ sub _authorize_silent {
     if (!defined $_ID_STORE_MODULE) {
         # Ensure that the Authy ID has already been found.
         $id = $RAD_REQUEST{cfg_radius_id_param()} if defined $RAD_REQUEST{cfg_radius_id_param()};
-        return _reply_invalid(ERR_AUTH_NO_ID_IN_REQUEST) unless defined $id;
+        return _reply_invalid(ERR_AUTH_NO_ID_IN_REQUEST) unless (defined $id || cfg_auth_create_user());
     }
     else {
         # Retrieve the ID using the user name.
         log_dbg("Retrieving Authy ID for '$user_name'");
         $id = eval { $_ID_STORE_MODULE->get_authy_id($user_name) };
         return _reply_error(ERR_AUTH_ID_RETRIEVAL_FAILED, $@) if $@;
-        return _reply_no_id() unless defined $id;
+        return _reply_no_id() unless (defined $id || cfg_auth_create_user());
+    }
+    # Create the user
+    if (! defined $id) {
+        log_dbg("Creating Authy ID for '$user_name'");
+        my $email = $RAD_REQUEST{cfg_radius_email_param()};
+        return _reply_invalid(ERR_AUTH_NO_EMAIL_IN_REQUEST) unless defined $email;
+        my $cellphone = $RAD_REQUEST{cfg_radius_cellphone_param()};
+        return _reply_invalid(ERR_AUTH_NO_CELLPHONE_IN_REQUEST) unless defined $cellphone;
+        my $countrycode = $RAD_REQUEST{cfg_radius_countrycode_param()};
+        return _reply_invalid(ERR_AUTH_NO_COUNTRYCODE_IN_REQUEST) unless defined $countrycode;
+        $id = _create_user($email, $cellphone, $countrycode);
+        if ((defined $_ID_STORE_MODULE) && ($_ID_STORE_MODULE->can('set_authy_id'))) {
+            log_dbg("Saving Authy ID for '$user_name'");
+            eval { $_ID_STORE_MODULE->set_authy_id($user_name, $id) };
+            return _reply_error(ERR_AUTH_ID_SAVING_FAILED, $@) if $@;
+        }
     }
     return _reply_error(ERR_AUTH_INVALID_ID) unless _looks_like_valid_id($id);
 
@@ -320,6 +353,41 @@ sub _authenticate_one_touch {
             }
         }
     }
+}
+
+sub _create_user {
+    my ($email, $cellphone, $countrycode) = @_;
+
+    # Create the web user agent.
+    my $user_agent = _create_web_user_agent();
+
+   # Send the create user request.
+    my $data = {
+        user => {email => $email, cellphone => $cellphone, country_code => $countrycode},
+    };
+    my $res = $user_agent->post(cfg_otp_create_user_url(),
+        Content_Type => 'application/json',
+        Content => JSON->new->allow_nonref->encode($data)
+    );
+    eval {
+        _ensure_external_response($res);
+    };
+    die err(ERR_CREATE_USER_REQUEST_FAILED_INTERNALLY, $@)."\n" if $@;
+
+    # Convert the response content to JSON.
+    my $res_code = $res->code();
+    my $res_content = $res->decoded_content();
+    my $res_json = eval { JSON->new->allow_nonref->decode($res_content) };
+    die err(ERR_CREATE_USER_REQUEST_FAILED_EXTERNALLY, $res_code, $@)."\n" if $@;
+
+    # Process the response.
+    if ($res_code == HTTP_OK && $res_json->{success}) {
+        # log_dbg($res_json->{message});
+        return $res_json->{user}->{id};
+    }
+
+    # Fail with the Authy-provided error message.
+    die err(ERR_CREATE_USER_REQUEST_FAILED_EXTERNALLY, $res_code, $res_json->{message} // $res_content)."\n";
 }
 
 sub _send_otp_request_and_prompt_for_otp {
