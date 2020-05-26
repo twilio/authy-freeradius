@@ -114,7 +114,7 @@ sub initialize {
             RetryDelay => [$connection_retry_delay],
         );
     };
-    die "Could not initialize LDAP connection pool: $@\n";
+    die "Could not initialize LDAP connection pool: $@\n" if $@;
 }
 
 sub _get_value {
