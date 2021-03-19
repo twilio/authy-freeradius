@@ -1,3 +1,5 @@
+**This library is no longer actively maintained. Please visit the Twilio Docs for [Authy usage documentation](https://www.twilio.com/docs/authy/api) or consider using the newer [Twilio Verify for your SMS verification needs.](https://www.twilio.com/docs/verify/api)**
+
 # Twilio FreeRADIUS MFA
 ## Purpose
 This repo and associated guides will provide a step-by-step introduction to utilizing Authy’s Time-based One Time Password (TOTP) and OneTouch features in a FreeRadius environment. 
@@ -8,8 +10,8 @@ Given the variety of Linux environments, your install requirements may vary slig
 
 ## Questions?
 
-Please reach out to sales@authy.com for engagement.
+Please reach out to help@twilio.com for engagement.
 
 # Contributing
 
-Push some code, create a PR.  We will review and merge if appropriate.
+We are no longer accepting contributions to this library.
